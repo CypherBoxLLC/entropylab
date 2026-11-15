@@ -78,7 +78,7 @@ function defaultDerive(masterSecret) {
 
 const SHARE_FAILURE = {
   "unknown-word": "Word {position} is not a SLIP-39 word.",
-  length: "This has {words} words, which is not a SLIP-39 share length. Most shares have 20 words (128-bit) or 33 (256-bit); other secret sizes give lengths from 22 to 59.",
+  length: "This has {words} words, which is not a SLIP-39 share length. Most shares have 20 words (128-bit) or 33 (256-bit); other secret sizes give some lengths between 22 and 59.",
   checksum: "The checksum does not match: at least one word is wrong. It catches any three wrong words but cannot say which.",
   "group-threshold": "Its group threshold is larger than its group count: this is not a valid share.",
   padding: "Its padding bits are not zero: this is not a valid share.",

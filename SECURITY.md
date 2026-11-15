@@ -696,6 +696,20 @@ the rolls or a setting change, when the mode changes, and on Clear. The rolls
 are hidden like typed shares. Check my written shares opens the backup check
 empty, so the written copies are checked from paper.
 
+Under a backup that combines, Replace these shares makes new shares for the
+same wallet (`slip39ResplitFromDice`). It splits the same encrypted master
+secret again, so every passphrase opens the same wallet as before and none is
+needed. The rolls are the only new randomness: every value the split draws
+comes from HKDF-SHA256 of SHA-256 of the roll digits, after at least as many
+rolls as the secret has bits (the Key Station's table, 50 to 100). An
+extendable backup gets a new identifier, so an old share cannot be mixed in;
+the original format keeps its identifier, which salts the encryption. The new
+shares are read back and must carry the same encrypted secret before they are
+shown; they match the reference implementation's `split_ems` word for word
+(`test/slip39-split.test.mjs`). The page says plainly that new shares cannot
+help if an old share may already have been seen, and asks for every old share
+to be destroyed once the new ones are written and checked.
+
 Typed shares, the passphrase and everything combined from them live in page
 memory and the panel's DOM only; there are no storage, clipboard or console
 writes (`test/slip39-check.test.mjs`). The master fingerprint and addresses

@@ -20,7 +20,7 @@
 // clear() (the panel's Clear, Clear Fields, End Session and pagehide)
 // empties every field and the result.
 
-import { SLIP39_DICE_ROLLS, combineSlip39, parseSlip39Share, slip39SharesFromDice, testSlip39Randomness, wipeSlip39 } from "./slip39.js";
+import { combineSlip39, parseSlip39Share, slip39DiceRollsNeeded, slip39ResplitFromDice, slip39SharesFromDice, testSlip39Randomness, wipeSlip39 } from "./slip39.js";
 import { HDKey } from "./hdkey.js";
 import { addressFor } from "./addresses.js";
 import { PassphraseVault, bindVaultField } from "./passphrase-vault.js";
@@ -269,6 +269,19 @@ export function mountSlip39Check(host, {
   const madeCheckRow = make("div", { class: "row tool-actions" });
   const madeCheck = make("button", { type: "button", class: "btn primary", id: "slip39-check-made-check", text: T("Check my written shares") });
   const restoredBlock = make("div", { id: "slip39-check-restored", hidden: true });
+  // Replace these shares: under a combined backup, new shares for the same
+  // wallet from the user's dice (slip39.js slip39ResplitFromDice).
+  const resplitBlock = make("div", { id: "slip39-check-resplit", hidden: true });
+  const resplitText = make("p", { class: "muted label-description", text: T("Make new shares for the same wallet, with randomness from your own dice. Use it to change how many shares you have or need, or to retire a set after a share was lost: once the new shares are written and checked, destroy every old one. Every passphrase opens the same wallet as before. It cannot help if an old share may already have been seen; then make a new wallet and move the funds.") });
+  const resplitDiceLabel = make("label", { class: "field", for: "slip39-check-resplit-dice" });
+  const resplitCount = make("span", { class: "field-note", id: "slip39-check-resplit-count" });
+  const resplitCue = make("span");
+  const resplitDice = make("textarea", { id: "slip39-check-resplit-dice", rows: "3", inputmode: "numeric", spellcheck: "false", autocomplete: "off", autocapitalize: "off", autocorrect: "off", "aria-describedby": "slip39-check-resplit-count" });
+  const resplitSharesChoice = numberSelect("slip39-check-resplit-shares", "Shares to make", 3);
+  const resplitThresholdChoice = numberSelect("slip39-check-resplit-threshold", "Shares needed to restore", 2);
+  const resplitRow = make("div", { class: "row tool-actions" });
+  const resplitButton = make("button", { type: "button", class: "btn primary", id: "slip39-check-resplit-run", text: T("Make new shares") });
+  const resplitStatus = make("p", { class: "edge-note is-private", id: "slip39-check-resplit-status", hidden: true });
   const summary = make("p", { class: "muted", id: "slip39-check-summary" });
   const fingerprintBlock = make("div", { id: "slip39-check-fingerprint" });
   const addressLabel = make("p", { class: "label", id: "slip39-check-address-label", text: T("First receive addresses (Native SegWit)") });
@@ -297,7 +310,11 @@ export function mountSlip39Check(host, {
   concealedBlock.append(concealedNote, concealedActions);
   restoredBlock.append(make("hr", { class: "result-divider" }), summary, fingerprintBlock, addressLabel, addressBlock, finalNote);
   status.append(headline, findingList, checkedNote);
-  result.append(status, madeBlock, restoredBlock);
+  resplitCount.append(resplitCue);
+  resplitDiceLabel.append(make("span", { text: T("Dice rolls (faces 1 to 6)") }), resplitCount, resplitDice);
+  resplitRow.append(resplitButton);
+  resplitBlock.append(make("p", { class: "label section-band", text: T("Replace these shares") }), resplitText, resplitDiceLabel, resplitSharesChoice.field, resplitThresholdChoice.field, resplitRow, resplitStatus);
+  result.append(status, madeBlock, restoredBlock, resplitBlock);
   host.replaceChildren(mode, backupPanel, randomPanel, makePanel, concealedBlock, result);
 
   // ── State ────────────────────────────────────────────────────────────────
@@ -422,6 +439,9 @@ export function mountSlip39Check(host, {
   // drawn again, in the page's language, on a network or language change.
   const renderRestored = () => {
     restoredBlock.hidden = !restored;
+    // Offered only under a backup combined in this mode, until it is re-split.
+    resplitBlock.hidden = !(restored && current === "backup" && !made);
+    countResplit();
     if (!restored) {
       relabel(summary, "text", () => "");
       fingerprintBlock.innerHTML = "";
@@ -471,6 +491,7 @@ export function mountSlip39Check(host, {
     restored = null;
     made = null;
     madeShown = false;
+    setResplitStatus(null);
     renderMade();
     renderRestored();
     setFindings([]);
@@ -550,9 +571,48 @@ export function mountSlip39Check(host, {
     }
   }
 
+  // The re-split's roll count: as many rolls as the backup's secret has bits.
+  function countResplit() {
+    const have = (resplitDice.value.match(/[1-6]/g) ?? []).length, need = slip39DiceRollsNeeded(restored?.shape.length ?? 16);
+    resplitCount.setAttribute("data-slip39-rolls", String(have));
+    resplitCount.setAttribute("data-slip39-rolls-needed", String(need));
+    resplitCue.className = have >= need ? "meta-cue" : "";
+    relabel(resplitCue, "text", T("{have} of {need} rolls", { have, need }));
+  }
+  function setResplitStatus(text) {
+    relabel(resplitStatus, "text", text ?? (() => ""));
+    resplitStatus.hidden = !text;
+  }
+
+  function runResplit() {
+    if (destroyed || concealed || current !== "backup" || !restored || made) return;
+    setResplitStatus(null);
+    const threshold = Number(resplitThresholdChoice.select.value), count = Number(resplitSharesChoice.select.value);
+    const read = readList("backup");
+    let outcome = null;
+    try {
+      if (read.failed || !read.shares.length) return setResplitStatus(T("The shares above could not be read again. Combine them again."));
+      outcome = slip39ResplitFromDice(read.shares, resplitDice.value, { threshold, count });
+      if (!outcome.ok) {
+        const vars = { ...outcome, bits: restored.shape.length * 8 }, text = MAKE_FAILURE[outcome.reason] ?? SET_FAILURE[outcome.reason] ?? SET_FAILURE.digest;
+        return setResplitStatus(() => `${say(text, vars)} ${say("No shares were made.")}`);
+      }
+    } catch {
+      return setResplitStatus(T("The new shares could not be made."));
+    } finally {
+      wipeShares(read);
+    }
+    made = { shares: outcome.shares, threshold, count, rolls: outcome.rolls };
+    madeShown = false;
+    setState("made");
+    setStatus("edge-note is-public", T("Made {count} new shares for the same wallet from {rolls} rolls. Any {threshold} of them restore it. Once they are written and checked, destroy every old share.", { count, rolls: made.rolls, threshold }));
+    renderMade();
+    renderRestored();
+  }
+
   // The roll count under the dice field, as the Key Station counts rolls.
   const countRolls = () => {
-    const have = (diceInput.value.match(/[1-6]/g) ?? []).length, need = SLIP39_DICE_ROLLS[size];
+    const have = (diceInput.value.match(/[1-6]/g) ?? []).length, need = slip39DiceRollsNeeded(size);
     diceCount.setAttribute("data-slip39-rolls", String(have));
     diceCount.setAttribute("data-slip39-rolls-needed", String(need));
     diceCue.className = have >= need ? "meta-cue" : "";
@@ -672,7 +732,7 @@ export function mountSlip39Check(host, {
     layout();
   };
 
-  const holdsShares = () => diceInput.value !== "" || Object.values(lists).some((list) => list.entries.some((entry) => entry.field.value !== ""));
+  const holdsShares = () => diceInput.value !== "" || resplitDice.value !== "" || Object.values(lists).some((list) => list.entries.some((entry) => entry.field.value !== ""));
   const conceal = () => {
     if (destroyed) return;
     // Made shares go back to bullets on every trigger, typed or not.
@@ -688,6 +748,8 @@ export function mountSlip39Check(host, {
     }
     held.dice = diceInput.value;
     diceInput.value = "";
+    held.resplit = resplitDice.value;
+    resplitDice.value = "";
     layout();
   };
   const unconceal = () => {
@@ -699,6 +761,8 @@ export function mountSlip39Check(host, {
     }
     diceInput.value = held.dice ?? "";
     delete held.dice;
+    resplitDice.value = held.resplit ?? "";
+    delete held.resplit;
     layout();
   };
 
@@ -711,6 +775,9 @@ export function mountSlip39Check(host, {
     makeField.clear();
     thresholdChoice.select.value = "2";
     countChoice.select.value = "3";
+    resplitDice.value = "";
+    resplitThresholdChoice.select.value = "2";
+    resplitSharesChoice.select.value = "3";
     setSize(16);
     resetResult();
     layout();
@@ -720,6 +787,11 @@ export function mountSlip39Check(host, {
   runButton.onclick = runBackup;
   compareButton.onclick = runRandomness;
   makeButton.onclick = runMake;
+  resplitButton.onclick = runResplit;
+  resplitDice.oninput = () => {
+    if (concealed) return;
+    countResplit();
+  };
   for (const button of sizeButtons) button.onclick = () => {
     setSize(Number(button.getAttribute("data-value")));
     makeChanged();

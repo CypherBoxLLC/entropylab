@@ -27,10 +27,11 @@ import { createHash, hkdfSync } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { combineSlip39, parseSlip39Share, recoverSlip39, slip39SharesFromDice, splitSlip39 } from "../src/js/slip39.js";
+import { combineSlip39, parseSlip39Share, recoverSlip39, slip39DiceRollsNeeded, slip39ResplitFromDice, slip39SharesFromDice, splitSlip39 } from "../src/js/slip39.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const fixture = JSON.parse(readFileSync(join(root, "test/fixtures/slip39/reference-sets.json"), "utf8"));
+const vectors = JSON.parse(readFileSync(join(root, "test/fixtures/slip39/vectors.json"), "utf8"));
 const hex = (bytes) => Buffer.from(bytes).toString("hex");
 const ascii = (text) => new TextEncoder().encode(text);
 const parse = (mnemonics) => mnemonics.map((mnemonic) => {
@@ -152,4 +153,51 @@ test("impossible splits are refused with no shares", () => {
     assert.equal(result.groups, undefined);
   }
   for (const length of [15, 17, 66]) assert.equal(splitSlip39(new Uint8Array(length), { groups: [[2, 3]], randomBytes: bytes }).reason, "length", String(length));
+});
+
+// ── Replace these shares: a re-split of the same encrypted master secret ──
+
+test("rolls needed follow the Key Station's table: 50, 62, 75, 87 and 100 for 16 to 32 bytes", () => {
+  // app.js hodlSeedLengths: hashRolls for 128, 160, 192, 224 and 256 bits.
+  assert.deepEqual([16, 20, 24, 28, 32].map(slip39DiceRollsNeeded), [50, 62, 75, 87, 100]);
+});
+
+for (const entry of fixture.resplit) {
+  test(`re-split gives the reference's new shares from the same rolls: ${entry.name}`, () => {
+    const [threshold, count] = entry.groups[0];
+    const result = slip39ResplitFromDice(parse(entry.old), entry.rolls, { threshold, count });
+    assert.equal(result.ok, true, result.reason);
+    assert.equal(result.identifier, entry.identifier);
+    assert.equal(result.keptIdentifier, entry.keptIdentifier);
+    assert.deepEqual(result.shares, entry.mnemonics);
+    // The same encrypted master secret, so every passphrase opens the same wallet as before.
+    assert.equal(hex(recoverSlip39(parse(entry.mnemonics.slice(-threshold))).ems), hex(recoverSlip39(parse(entry.old)).ems));
+  });
+}
+
+test("the new shares restore the original wallet with its passphrase, and another passphrase's wallet too", () => {
+  const entry = fixture.resplit.find((r) => r.name.startsWith("re-split 2-of-3 (extendable, passphrase)"));
+  const base = fixture.sets.find((set) => set.name === entry.base);
+  const fresh = parse(entry.mnemonics.slice(1, 4));
+  assert.equal(hex(combineSlip39(fresh, ascii(base.passphrase)).masterSecret), base.masterSecret);
+  assert.equal(hex(combineSlip39(fresh, ascii("another passphrase")).masterSecret), hex(combineSlip39(parse(entry.old), ascii("another passphrase")).masterSecret));
+});
+
+test("an old share never combines with the new ones", () => {
+  for (const entry of fixture.resplit) {
+    const [threshold] = entry.groups[0];
+    const mixed = parse([entry.old[0], ...entry.mnemonics.slice(0, threshold - 1)]);
+    assert.equal(recoverSlip39(mixed).ok, false, entry.name);
+  }
+});
+
+test("re-split: too few rolls for the secret's length, a set that does not combine, or an impossible split makes nothing", () => {
+  const wide = fixture.resplit.find((r) => r.name.startsWith("re-split 2-of-2 (192-bit"));
+  assert.deepEqual(slip39ResplitFromDice(parse(wide.old), wide.rolls.slice(0, 74), { threshold: 2, count: 3 }), { ok: false, reason: "too-few-rolls", have: 74, need: 75 });
+  const badDigest = parse(vectors[12][1]);
+  const refused = slip39ResplitFromDice(badDigest, wide.rolls, { threshold: 2, count: 3 });
+  assert.equal(refused.reason, "digest");
+  assert.equal(refused.shares, undefined);
+  assert.equal(slip39ResplitFromDice(parse(wide.old), wide.rolls, { threshold: 4, count: 3 }).reason, "threshold");
+  assert.equal(slip39ResplitFromDice(parse(wide.old), `${wide.rolls}x`, { threshold: 2, count: 3 }).reason, "not-dice");
 });

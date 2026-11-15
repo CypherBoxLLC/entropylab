@@ -12,7 +12,7 @@ Each entry is `[description, mnemonics, master secret hex, BIP32 master
 xprv]`; an empty master secret means the set must be refused. Every valid set
 uses the passphrase the specification names in that section.
 
-`reference-sets.json` holds 19 share sets split by the same reference
+`reference-sets.json` holds 19 share sets (`sets`) split by the same reference
 implementation, v0.3.0, with its random source replaced by a recorded
 stream. Regenerate it with `python3 -I scripts/slip39-reference.py
 <python-shamir-mnemonic checkout>`; the script refuses any reference file
@@ -29,3 +29,13 @@ every draw, single draws replaced by zero, one repeated byte or a counter,
 and a group-level R reused. The master secrets and streams come from
 SHA-256 of fixed labels; none is a real wallet. `test/slip39-reference.test.mjs`
 compares `src/js/slip39.js` with these draws.
+
+It also holds 5 `dice` sets, which pin Make shares from dice end to end: the
+master secret is the first 16 or 32 bytes of SHA-256 of the roll digits, and
+every splitting draw comes from HKDF-SHA256 of that hash (info "EntropyLab
+SLIP-39 shares"). And 5 `resplit` sets, which pin Replace these shares: an
+earlier set's encrypted master secret split again by the reference's
+`split_ems` from HKDF-SHA256 of the roll hash (info "EntropyLab SLIP-39
+re-split"), with a new identifier for an extendable backup. The generator
+checks each against the reference's own combine, with another passphrase
+too. The SHA-256 and HKDF for both run in Python's standard library.

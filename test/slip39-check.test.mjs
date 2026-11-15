@@ -637,3 +637,123 @@ test("a language switch relabels the make mode and keeps the shares and whether 
   assert.equal(ui.state(), "made");
   assert.ok(madeShares(ui)[1].textContent.includes(entry.mnemonics[0][1]));
 });
+
+// ── Replace these shares (a combined backup, re-split with dice) ──────────
+
+const resplitSet = (prefix) => fixture.resplit.find((entry) => entry.name.startsWith(prefix));
+const combineOld = (ui, entry) => {
+  const base = fixture.sets.find((set) => set.name === entry.base);
+  ui.fill("backup", entry.old);
+  if (base.passphrase) ui.typePassphrase(base.passphrase);
+  ui.$("slip39-check-run").click();
+  return base;
+};
+const resplit = (ui, entry, rolls = entry.rolls) => {
+  const [threshold, count] = entry.groups[0];
+  const dice = ui.$("slip39-check-resplit-dice");
+  dice.value = rolls;
+  dice.dispatchEvent({ type: "input" });
+  for (const [id, value] of [["slip39-check-resplit-shares", count], ["slip39-check-resplit-threshold", threshold]]) {
+    const select = ui.$(id);
+    select.value = String(value);
+    select.dispatchEvent({ type: "change" });
+  }
+  ui.$("slip39-check-resplit-run").click();
+};
+
+test("Replace these shares shows only under a combined backup", () => {
+  const ui = mount();
+  assert.equal(ui.$("slip39-check-resplit").hidden, true);
+  combineOld(ui, resplitSet("re-split 5-of-8"));
+  assert.equal(ui.state(), "restored");
+  assert.equal(ui.$("slip39-check-resplit").hidden, false);
+  // The roll count follows the backup's secret length.
+  assert.equal(ui.$("slip39-check-resplit-count").getAttribute("data-slip39-rolls-needed"), "50");
+  ui.choose("make");
+  assert.equal(ui.$("slip39-check-resplit").hidden, true);
+});
+
+test("re-split: the reference's new shares, hidden until shown, for the same wallet", () => {
+  const entry = resplitSet("re-split 2-of-3 (extendable, passphrase)");
+  const ui = mount();
+  const base = combineOld(ui, entry);
+  const fingerprint = ui.fingerprint();
+  assert.equal(fingerprint, reference(base.masterSecret).fingerprint);
+  resplit(ui, entry);
+  assert.equal(ui.state(), "made");
+  assert.equal(madeShares(ui).length, entry.mnemonics.length);
+  assert.ok(!showsShareWords(ui, entry.mnemonics));
+  ui.$("slip39-check-made-reveal").click();
+  madeShares(ui).forEach((item, i) => assert.ok(item.textContent.includes(entry.mnemonics[i]), `share ${i + 1}`));
+  assert.equal(ui.fingerprint(), fingerprint);
+  assert.equal(ui.$("slip39-check-resplit").hidden, true);
+});
+
+test("a refused re-split says why and keeps the combined wallet on screen", () => {
+  const entry = resplitSet("re-split 5-of-8");
+  const ui = mount();
+  combineOld(ui, entry);
+  const fingerprint = ui.fingerprint();
+  resplit(ui, entry, entry.rolls.slice(0, 49));
+  assert.equal(ui.state(), "restored");
+  assert.equal(ui.$("slip39-check-resplit-status").hidden, false);
+  assert.notEqual(ui.$("slip39-check-resplit-status").textContent, "");
+  assert.equal(madeShares(ui).length, 0);
+  assert.equal(ui.fingerprint(), fingerprint);
+  // A good run afterwards clears the refusal.
+  resplit(ui, entry);
+  assert.equal(ui.state(), "made");
+  assert.equal(ui.$("slip39-check-resplit-status").hidden, true);
+});
+
+test("after a re-split, the new shares typed back restore the same wallet with the same passphrase", () => {
+  const entry = resplitSet("re-split 2 of 3 groups (original format, passphrase)");
+  const ui = mount();
+  const base = combineOld(ui, entry);
+  resplit(ui, entry);
+  ui.$("slip39-check-made-check").click();
+  assert.ok(ui.fields("backup").every((field) => field.value === ""));
+  ui.fill("backup", entry.mnemonics);
+  ui.typePassphrase(base.passphrase);
+  ui.$("slip39-check-run").click();
+  restores(ui, base.masterSecret);
+});
+
+test("conceal() hides the re-split rolls and the new shares; a changed old share drops them", () => {
+  const entry = resplitSet("re-split 5-of-8");
+  const ui = mount();
+  combineOld(ui, entry);
+  const dice = ui.$("slip39-check-resplit-dice");
+  dice.value = entry.rolls;
+  dice.dispatchEvent({ type: "input" });
+  ui.panel.conceal();
+  assert.equal(dice.value, "");
+  ui.$("slip39-check-unconceal").click();
+  assert.equal(dice.value, entry.rolls);
+  resplit(ui, entry);
+  ui.$("slip39-check-made-reveal").click();
+  ui.panel.conceal();
+  assert.ok(!showsShareWords(ui, entry.mnemonics));
+  ui.$("slip39-check-unconceal").click();
+  const field = ui.fields("backup")[0];
+  field.value = `${field.value} `;
+  field.dispatchEvent({ type: "input" });
+  assert.equal(ui.state(), "stale");
+  assert.equal(madeShares(ui).length, 0);
+  assert.equal(ui.fingerprint(), "");
+});
+
+test("clear() leaves no re-split roll; a language switch relabels the section", () => {
+  const entry = resplitSet("re-split 5-of-8");
+  let language = "en";
+  const ui = mount({ translate: (text) => (language === "en" ? text : `[${language}] ${text}`) });
+  combineOld(ui, entry);
+  language = "xx";
+  ui.panel.retranslate();
+  assert.ok(ui.$("slip39-check-resplit-run").textContent.startsWith("[xx] "));
+  const dice = ui.$("slip39-check-resplit-dice");
+  dice.value = entry.rolls;
+  ui.panel.clear();
+  assert.equal(dice.value, "");
+  assert.equal(ui.$("slip39-check-resplit").hidden, true);
+});

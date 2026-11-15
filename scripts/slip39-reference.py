@@ -29,10 +29,20 @@ convention computed here independently: pool = SHA-256 of the roll digits
 or 32 bytes of the pool, and every splitting draw read in order from
 HKDF-SHA256 (RFC 5869, empty salt, info "EntropyLab SLIP-39 shares") of the
 pool. The original (not extendable) format, iteration exponent 1.
+
+The "resplit" sets pin Replace these shares: an earlier set's encrypted
+master secret (recovered by the reference) split again by the reference's
+split_ems, with every draw read from HKDF-SHA256 of the roll hash (info
+"EntropyLab SLIP-39 re-split"). An extendable set gets a new identifier,
+drawn first; the original format keeps its identifier, which salts the
+encryption. Each set is checked to restore the original master secret with
+the original passphrase, and the same secret as the old shares with another
+passphrase.
 """
 import hashlib
 import hmac
 import json
+import math
 from pathlib import Path
 import secrets
 import sys
@@ -129,6 +139,45 @@ def dice_set(name: str, rolls: str, n: int, threshold: int, count: int, passphra
     out = generate(spec)
     assert stream.buffer == b"", "every drawn byte is used"
     return {"rolls": rolls, "pool": pool.hex(), **out}
+
+
+def rolls_needed(n: int) -> int:
+    """Fair-die rolls to carry n bytes of entropy, as the Key Station counts them."""
+    return math.ceil(n * 8 / math.log2(6))
+
+
+def resplit_set(name: str, base: dict, rolls: str, threshold: int, count: int) -> dict:
+    old = []
+    for index, (group_threshold, _count) in enumerate(base["groups"][: base["groupThreshold"]]):
+        old += base["mnemonics"][index][:group_threshold]
+    ems = shamir.recover_ems(shamir_mnemonic.decode_mnemonics(old))
+    n = len(ems.ciphertext)
+    assert len(rolls) >= rolls_needed(n), name
+    pool = hashlib.sha256(rolls.encode()).digest()
+    need = (2 if ems.extendable else 0) + ((threshold - 2) * n + (n - 4) if threshold >= 2 else 0)
+    stream = HkdfStream(pool, b"EntropyLab SLIP-39 re-split", need)
+    identifier = (int.from_bytes(stream.take(2), "big") & 0x7FFF) if ems.extendable else ems.identifier
+    again = shamir.EncryptedMasterSecret(identifier, ems.extendable, ems.iteration_exponent, ems.ciphertext)
+    shamir.RANDOM_BYTES = stream.take
+    try:
+        grouped = shamir.split_ems(1, [(threshold, count)], again)
+    finally:
+        shamir.RANDOM_BYTES = secrets.token_bytes
+    assert stream.buffer == b"", "every drawn byte is used"
+    mnemonics = [share.mnemonic() for share in grouped[0]]
+    secret = bytes.fromhex(base["masterSecret"])
+    assert shamir_mnemonic.combine_mnemonics(mnemonics[-threshold:], base["passphrase"].encode()) == secret
+    assert shamir_mnemonic.combine_mnemonics(mnemonics[:threshold], b"another passphrase") == shamir_mnemonic.combine_mnemonics(old, b"another passphrase")
+    return {"name": name, "base": base["name"], "old": old, "rolls": rolls, "pool": pool.hex(), "groups": [[threshold, count]], "identifier": identifier, "keptIdentifier": not ems.extendable, "mnemonics": mnemonics}
+
+
+RESPLIT = [
+    ("re-split 2-of-3 (extendable, passphrase) as 3-of-5", "2-of-3, 128-bit, passphrase", "resplit a", 50, 3, 5),
+    ("re-split 5-of-8 (original format) as 2-of-3", "5-of-8, 128-bit, not extendable", "resplit b", 50, 2, 3),
+    ("re-split 3 of 4 groups (256-bit) as 2-of-3", "3 of 4 groups, 256-bit", "resplit c", 100, 2, 3),
+    ("re-split 2-of-2 (192-bit, e=2) as 2-of-4", "2-of-2, 192-bit, e=2", "resplit d", 75, 2, 4),
+    ("re-split 2 of 3 groups (original format, passphrase) as 3-of-3", "2 of 3 groups, 128-bit, not extendable", "resplit e", 60, 3, 3),
+]
 
 
 DICE = [
@@ -270,8 +319,10 @@ def main():
         "sets": sets,
         "dice": [dice_set(*entry) for entry in DICE],
     }
+    by_name = {entry["name"]: entry for entry in sets}
+    out["resplit"] = [resplit_set(name, by_name[base], dice_rolls(label, rolls), threshold, count) for name, base, label, rolls, threshold, count in RESPLIT]
     OUT.write_text(json.dumps(out, indent=1) + "\n")
-    print(f"wrote {OUT.relative_to(ROOT)}: {len(sets)} sets, {len(out['dice'])} dice sets")
+    print(f"wrote {OUT.relative_to(ROOT)}: {len(sets)} sets, {len(out['dice'])} dice sets, {len(out['resplit'])} re-split sets")
 
 
 main()

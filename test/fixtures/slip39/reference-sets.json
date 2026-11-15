@@ -1381,5 +1381,135 @@
     ]
    ]
   }
+ ],
+ "resplit": [
+  {
+   "name": "re-split 2-of-3 (extendable, passphrase) as 3-of-5",
+   "base": "2-of-3, 128-bit, passphrase",
+   "old": [
+    "ugly keyboard academic acid blanket episode evil lair typical anxiety furl plot freshman advocate heat smart review stadium owner hairy",
+    "ugly keyboard academic agency divorce robin adapt modern frequent actress ajar cards brother daisy chemical sniff airport firefly relate elder"
+   ],
+   "rolls": "53513335522635361646411525461524345165331215232334",
+   "pool": "565bbfef86a59f0382d0a8c2ba44c9e1819c66b0c4bf520486f89939433a7fd9",
+   "groups": [
+    [
+     3,
+     5
+    ]
+   ],
+   "identifier": 26235,
+   "keptIdentifier": false,
+   "mnemonics": [
+    "skunk surprise academic acne admit episode anatomy segment briefing hybrid rival script payment loyalty enjoy elevator olympic saver blue alto",
+    "skunk surprise academic agree agency total clothes training ceramic marvel receiver cowboy alto paid smirk thorn picture mansion problem image",
+    "skunk surprise academic amazing budget spray pharmacy aquatic behavior speak endorse video imply organize already amuse gross election sled dance",
+    "skunk surprise academic arcade calcium kernel maiden class crucial damage explain burning standard literary mental prize frost angry injury float",
+    "skunk surprise academic axle champion crucial diagnose describe disaster duckling demand aide indicate bundle uncover saver airline toxic carpet slim"
+   ]
+  },
+  {
+   "name": "re-split 5-of-8 (original format) as 2-of-3",
+   "base": "5-of-8, 128-bit, not extendable",
+   "old": [
+    "gross husband academic acrobat center unknown detect budget elder install hand prevent afraid item else tricycle daughter swimming theory episode",
+    "gross husband academic aircraft depart legend smart smirk credit energy fiscal fishing cricket midst herd sheriff duration animal hormone shadow",
+    "gross husband academic amount disaster square voice rainbow emerald health medical clothes peanut reunion view ordinary peasant species fortune prospect",
+    "gross husband academic argue beam remember emission science funding snapshot safari diagnose numerous fluff teacher crunch forward expand species divorce",
+    "gross husband academic beard counter devote chew family tenant manual timely sled flea slush various relate impulse unfold camera stilt"
+   ],
+   "rolls": "11534325631545134632265366351343164136656214623536",
+   "pool": "53225b7b856adcf1c2b1716ad7372fc2f82eb66ed877df88587b940f128b2f24",
+   "groups": [
+    [
+     2,
+     3
+    ]
+   ],
+   "identifier": 13166,
+   "keptIdentifier": true,
+   "mnemonics": [
+    "gross husband academic acid carve mixture crystal rebuild window dramatic process scroll dough plot ocean crucial marathon excuse bulge security",
+    "gross husband academic agency deal industry merchant various vampire decision glasses welcome sheriff diminish fluff havoc emphasis device zero render",
+    "gross husband academic always alcohol employer distance drove unhappy club dilemma privacy flip manager install broken capture ticket dramatic realize"
+   ]
+  },
+  {
+   "name": "re-split 3 of 4 groups (256-bit) as 2-of-3",
+   "base": "3 of 4 groups, 256-bit",
+   "old": [
+    "taught wisdom adequate romp antenna quick admit disease weapon best forecast erode envelope deliver typical kitchen deploy weapon maximum gums science nylon fact equation retailer type glasses cluster making aluminum universe trial game",
+    "taught wisdom behavior roster alive headset group graduate album presence install desire loud ticket guitar sweater increase owner sunlight toxic express erode rainbow scandal blanket mama leaf herald always nuclear decent punish says",
+    "taught wisdom behavior scared album dwarf adapt reward likely remove leader tension unknown anxiety voice tofu short angel cinema expand negative explain crowd spill diminish mama glasses hush parking armed sled science editor",
+    "taught wisdom check round adjust inside racism numerous crazy sack elegant cleanup born endless client render fact manual extra adorn cubic keyboard smirk loud smell receiver shrimp patrol width insect repeat survive craft",
+    "taught wisdom check scatter aircraft again brother argue havoc relate umbrella pharmacy holiday destroy mama helpful permit ambition username trouble column dramatic roster have force finger fantasy pecan market editor salon liberty salon",
+    "taught wisdom check shaft album already mineral mineral pulse permit together simple extra havoc warn wits prune apart favorite depart snapshot tenant fused level course silent worthy math manager critical artwork hour kernel"
+   ],
+   "rolls": "1245613136654514153655125453431322145423116552625144254556524226323666546611223355466235233522222222",
+   "pool": "8087a05720aa367ecec2a680b8ff9cad2d7d97dd7327b13ad72404a0b3d8acea",
+   "groups": [
+    [
+     2,
+     3
+    ]
+   ],
+   "identifier": 21236,
+   "keptIdentifier": false,
+   "mnemonics": [
+    "phantom pecan academic acid alien ajar lunch counter exchange already news smirk agree plastic quantity punish moisture airport lift warmth both briefing grumpy evoke buyer grant trip dish kidney music born tadpole glance",
+    "phantom pecan academic agency antenna deliver wealthy extend step revenue therapy remind military sprinkle envy oral physics source chest infant loan fiscal stick piece leader standard strategy deadline greatest grumpy costume cards upgrade",
+    "phantom pecan academic always artwork ugly havoc strike grocery desktop glasses column overall axis funding luck weapon preach sugar tenant device lily adjust paid listen lizard market lamp unfold usher curious spend single"
+   ]
+  },
+  {
+   "name": "re-split 2-of-2 (192-bit, e=2) as 2-of-4",
+   "base": "2-of-2, 192-bit, e=2",
+   "old": [
+    "triumph exact academic acid academic tolerate imply impact earth garlic dining ancient expect lilac cause extra always skunk believe ultimate diminish smear minister vexed theory advance true",
+    "triumph exact academic agency acquire depend lamp exotic pregnant swing member rebuild scroll prayer paper zero squeeze senior move decrease spider method club busy analysis cubic modify"
+   ],
+   "rolls": "631213436622226125624541436325115355323455145424113533232155142256154666253",
+   "pool": "fbb7df49d5ac110d9b668096dd3db9ddfb8e9a03cf3839969eab94db1622e6fa",
+   "groups": [
+    [
+     2,
+     4
+    ]
+   ],
+   "identifier": 26909,
+   "keptIdentifier": false,
+   "mnemonics": [
+    "solution ugly academic acid acquire lecture wealthy building satoshi furl nuclear loyalty morning likely withdraw marathon impact either dynamic memory item yelp envelope glad strategy piece detect",
+    "solution ugly academic agency acquire scene suitable credit inmate dream froth resident rumor survive thank unfold element grasp club fact home testify depict friendly duration quiet resident",
+    "solution ugly academic always acquire angel reward dress railroad very pajamas regular dwarf fiber glen slim away anxiety buyer vegan fiction scandal process often museum deal sweater",
+    "solution ugly academic aquatic acquire expect package arcade adequate mild grasp lilac hazard animal keyboard premium ceramic dance aircraft crunch election strategy spend pecan image cleanup fancy"
+   ]
+  },
+  {
+   "name": "re-split 2 of 3 groups (original format, passphrase) as 3-of-3",
+   "base": "2 of 3 groups, 128-bit, not extendable",
+   "old": [
+    "dwarf garden acrobat leaf burning genuine tension moisture educate language execute acquire finger tendency angry hybrid squeeze slush marvel ambition",
+    "dwarf garden acrobat lily crisis airline famous rebuild budget diminish describe cage elephant debris listen capital earth union building best",
+    "dwarf garden beard learn away garden flame beaver scandal yoga average slice rocky beard boring upgrade freshman false always species",
+    "dwarf garden beard lips academic luxury medal should depart suitable energy withdraw trust teacher sled hanger evoke dynamic grief enemy",
+    "dwarf garden beard luxury devote enforce editor spew category elbow ancestor crucial level move drink cinema problem verify public zero"
+   ],
+   "rolls": "252142644664343532455332443111622244345634511223652146521254",
+   "pool": "5ec8329fc9576e8f8411fe522ef923874fc3fb0f9bf1bbeae95f20175d790630",
+   "groups": [
+    [
+     3,
+     3
+    ]
+   ],
+   "identifier": 8044,
+   "keptIdentifier": true,
+   "mnemonics": [
+    "dwarf garden academic acne cubic makeup moisture alarm debris roster have game bolt champion timely profile cleanup benefit forward rich",
+    "dwarf garden academic agree acid morning gross laden western sprinkle undergo surprise thank spine breathe genuine trial metric unfold shaft",
+    "dwarf garden academic amazing dance staff writing beam trust fumes work oven spit station inherit peaceful crowd lilac bedroom losing"
+   ]
+  }
  ]
 }

@@ -31,6 +31,9 @@ const vectors = JSON.parse(readFileSync(join(root, "test/fixtures/slip39/vectors
 // The passphrase the SLIP-0039 specification gives for every valid vector.
 const VECTOR_PASSPHRASE = "TREZOR";
 const vector = (n) => ({ mnemonics: vectors[n - 1][1], secret: vectors[n - 1][2] });
+// Dice sets split by the reference implementation from the same rolls.
+const fixture = JSON.parse(readFileSync(join(root, "test/fixtures/slip39/reference-sets.json"), "utf8"));
+const diceSet = (name) => fixture.dice.find((entry) => entry.name === name);
 
 // Signet shares testnet's encodings; regtest differs only in its bech32 HRP.
 const REGTEST = { ...TEST_NETWORK, bech32: "bcrt" };
@@ -476,4 +479,161 @@ test("the panel's modules use no storage, console, clipboard or network API", ()
       assert.ok(!source.includes(api), `${file} uses ${api}`);
     }
   }
+});
+
+// ── Make shares from dice ─────────────────────────────────────────────────
+
+const makeShares = (ui, entry) => {
+  ui.choose("make");
+  const [threshold, count] = entry.groups[0];
+  ui.$("slip39-check-make-size").querySelector(`[data-value="${entry.masterSecret.length / 2}"]`).click();
+  const dice = ui.$("slip39-check-make-dice");
+  dice.value = entry.rolls;
+  dice.dispatchEvent({ type: "input" });
+  for (const [id, value] of [["slip39-check-make-shares", count], ["slip39-check-make-threshold", threshold]]) {
+    const select = ui.$(id);
+    select.value = String(value);
+    select.dispatchEvent({ type: "change" });
+  }
+  if (entry.passphrase) {
+    const field = ui.$("slip39-check-make-pass");
+    field.value = entry.passphrase;
+    field.dispatchEvent({ type: "input" });
+  }
+  ui.$("slip39-check-make-run").click();
+};
+const madeShares = (ui) => ui.$("slip39-check-made-list").querySelectorAll("[data-slip39-made-share]");
+const showsShareWords = (ui, mnemonics) => mnemonics.some((mnemonic) => ui.host.innerHTML.includes(mnemonic.split(" ").slice(0, 3).join(" ")));
+
+test("make shares from dice: the reference's shares, hidden until shown, and the wallet they restore", () => {
+  const entry = diceSet("dice 3-of-5, 256-bit, passphrase");
+  const ui = mount();
+  makeShares(ui, entry);
+  assert.equal(ui.state(), "made");
+  assert.equal(madeShares(ui).length, 5);
+  assert.deepEqual(madeShares(ui).map((item) => item.getAttribute("data-slip39-made-share")), ["1", "2", "3", "4", "5"]);
+  assert.ok(!showsShareWords(ui, entry.mnemonics[0]));
+  ui.$("slip39-check-made-reveal").click();
+  assert.equal(ui.$("slip39-check-made-reveal").getAttribute("aria-pressed"), "true");
+  madeShares(ui).forEach((item, i) => assert.ok(item.textContent.includes(entry.mnemonics[0][i]), `share ${i + 1}`));
+  // The master secret is the wallet's BIP32 seed; the passphrase only encrypts it in the shares.
+  const expected = reference(entry.masterSecret);
+  assert.equal(ui.fingerprint(), expected.fingerprint);
+  assert.deepEqual(ui.addresses(), expected.addresses);
+  // The passphrase field shows bullets only.
+  assert.equal(ui.$("slip39-check-make-pass").value, VAULT_MASK.repeat(entry.passphrase.length));
+});
+
+test("the roll count follows the secret size; too few rolls or a non-die character makes nothing", () => {
+  const ui = mount();
+  ui.choose("make");
+  const count = ui.$("slip39-check-make-count");
+  const dice = ui.$("slip39-check-make-dice");
+  dice.value = "123456".repeat(8) + "1";
+  dice.dispatchEvent({ type: "input" });
+  assert.deepEqual([count.getAttribute("data-slip39-rolls"), count.getAttribute("data-slip39-rolls-needed")], ["49", "50"]);
+  ui.$("slip39-check-make-size").querySelector('[data-value="32"]').click();
+  assert.equal(count.getAttribute("data-slip39-rolls-needed"), "100");
+  ui.$("slip39-check-make-size").querySelector('[data-value="16"]').click();
+  ui.$("slip39-check-make-run").click();
+  assert.equal(ui.state(), "failed");
+  assert.equal(madeShares(ui).length, 0);
+  assert.equal(ui.fingerprint(), "");
+  dice.value = "123456".repeat(9) + "7";
+  dice.dispatchEvent({ type: "input" });
+  ui.$("slip39-check-make-run").click();
+  assert.equal(ui.state(), "failed");
+  assert.equal(madeShares(ui).length, 0);
+});
+
+test("an impossible split is refused: more shares needed than made, or one needed of several", () => {
+  const entry = diceSet("dice 2-of-3, 128-bit");
+  for (const groups of [[[4, 3]], [[1, 3]]]) {
+    const ui = mount();
+    makeShares(ui, { ...entry, groups });
+    assert.equal(ui.state(), "failed", JSON.stringify(groups));
+    assert.equal(madeShares(ui).length, 0);
+    assert.equal(ui.fingerprint(), "");
+  }
+});
+
+test("conceal() hides the rolls and the shares; the rolls come back with Show my shares, the shares only when shown again", () => {
+  const entry = diceSet("dice 2-of-3, 128-bit");
+  const ui = mount();
+  makeShares(ui, entry);
+  ui.$("slip39-check-made-reveal").click();
+  ui.panel.conceal();
+  assert.equal(ui.$("slip39-check-make-dice").value, "");
+  assert.equal(ui.$("slip39-check-make-panel").hidden, true);
+  assert.ok(!showsShareWords(ui, entry.mnemonics[0]));
+  assert.equal(ui.$("slip39-check-made-reveal").getAttribute("aria-pressed"), "false");
+  // The result's public values stay.
+  assert.equal(ui.fingerprint(), reference(entry.masterSecret).fingerprint);
+  ui.$("slip39-check-unconceal").click();
+  assert.equal(ui.$("slip39-check-make-dice").value, entry.rolls);
+  assert.ok(!showsShareWords(ui, entry.mnemonics[0]));
+  ui.$("slip39-check-made-reveal").click();
+  assert.ok(madeShares(ui)[0].textContent.includes(entry.mnemonics[0][0]));
+});
+
+test("changing the rolls or a setting drops the made shares", () => {
+  const entry = diceSet("dice 2-of-3, 128-bit");
+  for (const change of [
+    (ui) => { const dice = ui.$("slip39-check-make-dice"); dice.value += "1"; dice.dispatchEvent({ type: "input" }); },
+    (ui) => { const select = ui.$("slip39-check-make-threshold"); select.value = "3"; select.dispatchEvent({ type: "change" }); },
+    (ui) => ui.$("slip39-check-make-size").querySelector('[data-value="32"]').click(),
+  ]) {
+    const ui = mount();
+    makeShares(ui, entry);
+    ui.$("slip39-check-made-reveal").click();
+    change(ui);
+    assert.equal(ui.state(), "stale");
+    assert.equal(madeShares(ui).length, 0);
+    assert.equal(ui.fingerprint(), "");
+    assert.ok(!showsShareWords(ui, entry.mnemonics[0]));
+  }
+});
+
+test("Check my written shares opens the backup check with empty fields and drops the made shares", () => {
+  const entry = diceSet("dice 2-of-3, 128-bit");
+  const ui = mount();
+  makeShares(ui, entry);
+  ui.$("slip39-check-made-check").click();
+  assert.equal(ui.$("slip39-check-backup-panel").hidden, false);
+  assert.equal(ui.$("slip39-check-make-panel").hidden, true);
+  assert.ok(ui.fields("backup").every((field) => field.value === ""));
+  assert.equal(ui.state(), "empty");
+  assert.equal(madeShares(ui).length, 0);
+  // The written copies, typed back, restore the same wallet.
+  ui.fill("backup", entry.mnemonics[0].slice(0, 2));
+  ui.$("slip39-check-run").click();
+  restores(ui, entry.masterSecret);
+});
+
+test("clear() leaves no roll, passphrase or share", () => {
+  const entry = diceSet("dice 3-of-5, 256-bit, passphrase");
+  const ui = mount();
+  makeShares(ui, entry);
+  ui.$("slip39-check-made-reveal").click();
+  ui.panel.clear();
+  assert.equal(ui.$("slip39-check-make-dice").value, "");
+  assert.equal(ui.$("slip39-check-make-pass").value, "");
+  assert.equal(madeShares(ui).length, 0);
+  assert.equal(ui.state(), "empty");
+  assert.ok(!showsShareWords(ui, entry.mnemonics[0]));
+});
+
+test("a language switch relabels the make mode and keeps the shares and whether they show", () => {
+  const entry = diceSet("dice 2-of-3, 128-bit");
+  let language = "en";
+  const ui = mount({ translate: (text) => (language === "en" ? text : `[${language}] ${text}`) });
+  makeShares(ui, entry);
+  ui.$("slip39-check-made-reveal").click();
+  language = "xx";
+  ui.panel.retranslate();
+  for (const id of ["slip39-check-make-run", "slip39-check-made-reveal", "slip39-check-made-check", "slip39-check-status"]) {
+    assert.ok(ui.$(id).textContent.startsWith("[xx] "), id);
+  }
+  assert.equal(ui.state(), "made");
+  assert.ok(madeShares(ui)[1].textContent.includes(entry.mnemonics[0][1]));
 });

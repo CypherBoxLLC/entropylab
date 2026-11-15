@@ -7126,6 +7126,8 @@ function hodlBindSlip39Check() {
       hodlSlip39Check = module.mountSlip39Check(host, {
         translate: hodlTText,
         network: () => hodlNetworkChoice,
+        // Shares made from dice render as the app's private values.
+        privateValue: (value, revealed) => hodlPrivateValue(value, "secret private-field-value", revealed),
         // The Key Station's own readouts: a copyable field and the address table.
         fieldHtml: (label, value) => hodlPublicFieldHtml(label, value),
         addressTableHtml: (rows) => hodlAddressTable(rows, hodlTText("First receive addresses"), false, "slip39-receive"),

@@ -20,7 +20,7 @@
 // clear() (the panel's Clear, Clear Fields, End Session and pagehide)
 // empties every field and the result.
 
-import { combineSlip39, parseSlip39Share, testSlip39Randomness, wipeSlip39 } from "./slip39.js";
+import { SLIP39_DICE_ROLLS, combineSlip39, parseSlip39Share, slip39SharesFromDice, testSlip39Randomness, wipeSlip39 } from "./slip39.js";
 import { HDKey } from "./hdkey.js";
 import { addressFor } from "./addresses.js";
 import { PassphraseVault, bindVaultField } from "./passphrase-vault.js";
@@ -105,6 +105,14 @@ const SET_FAILURE = {
   "iteration-exponent": "This backup's iteration exponent is {exponent}, which needs {iterations} PBKDF2 iterations. This page decrypts up to exponent {max}, so it does not freeze. The randomness test does not decrypt and works with any exponent.",
   "no-random-values": "{set} has no random values to compare: its thresholds are all 1. Make share sets that need 2 or more shares.",
 };
+const MAKE_FAILURE = {
+  "not-dice": "Character {position} is not a die face: type only the numbers 1 to 6.",
+  "too-few-rolls": "A {bits}-bit secret needs at least {need} rolls; {have} so far.",
+  threshold: "You cannot need more shares than you make.",
+  "threshold-one": "With one share needed, make just one: copies of a share are all the same share.",
+  count: "Make between 1 and 16 shares.",
+  passphrase: "SLIP-39 passphrases use printable ASCII only: letters, digits, punctuation and spaces.",
+};
 const PATTERN_TEXT = {
   zero: "{value} in {set} is all zero bytes.",
   "repeated-byte": "{value} in {set} is one byte repeated.",
@@ -125,6 +133,8 @@ export function mountSlip39Check(host, {
   translate = (text) => text,
   derive = defaultDerive,
   testRandomness = testSlip39Randomness,
+  // A private value's markup: the app's (data-private-value, no selection).
+  privateValue = (value) => escapeHtml(value),
   fieldHtml = defaultFieldHtml,
   addressTableHtml = defaultAddressTableHtml,
   maxIterationExponent = MAX_ITERATION_EXPONENT,
@@ -165,8 +175,8 @@ export function mountSlip39Check(host, {
 
   // Layout follows docs/UI_Patterns.md: labels, field notes, edge notes,
   // `.row.tool-actions` action rows and `.btn` buttons.
-  const mode = make("div", { class: "segmented-control", id: "slip39-check-mode", role: "group", "aria-label": T("What to check") });
-  const modeButtons = [["backup", "Check a backup"], ["randomness", "Test share randomness"]].map(([value, text]) => {
+  const mode = make("div", { class: "segmented-control", id: "slip39-check-mode", role: "group", "aria-label": T("What to do") });
+  const modeButtons = [["backup", "Check a backup"], ["randomness", "Test share randomness"], ["make", "Make shares from dice"]].map(([value, text]) => {
     const button = make("button", { type: "button", class: "tab", "data-value": value, "aria-pressed": "false", text: T(text) });
     mode.appendChild(button);
     return button;
@@ -205,6 +215,37 @@ export function mountSlip39Check(host, {
   const compareRow = make("div", { class: "row tool-actions" });
   const compareButton = make("button", { type: "button", class: "btn primary", id: "slip39-check-compare", text: T("Compare the two sets") });
 
+  // Make shares from dice: the rolls are the only randomness (slip39.js).
+  const makePanel = make("div", { id: "slip39-check-make-panel", hidden: true });
+  const makeIntro = make("p", { class: "edge-note is-info", id: "slip39-check-make-intro", text: T("Roll a fair six-sided die and type every roll. The rolls are the only randomness: they become the master secret and every value the split needs, so no device's random number generator is trusted. Then restore your hardware wallet from these shares.") });
+  const sizeControl = make("div", { class: "segmented-control", id: "slip39-check-make-size", role: "group", "aria-label": T("Secret size") });
+  const sizeButtons = [["16", "128-bit (20-word shares)"], ["32", "256-bit (33-word shares)"]].map(([value, text]) => {
+    const button = make("button", { type: "button", class: "tab", "data-value": value, "aria-pressed": "false", text: T(text) });
+    sizeControl.appendChild(button);
+    return button;
+  });
+  const diceLabel = make("label", { class: "field", for: "slip39-check-make-dice" });
+  const diceName = make("span", { text: T("Dice rolls (faces 1 to 6)") });
+  const diceCount = make("span", { class: "field-note", id: "slip39-check-make-count" });
+  const diceCue = make("span");
+  const diceInput = make("textarea", { id: "slip39-check-make-dice", rows: "3", inputmode: "numeric", spellcheck: "false", autocomplete: "off", autocapitalize: "off", autocorrect: "off", "aria-describedby": "slip39-check-make-count" });
+  const numberSelect = (id, label, chosen) => {
+    const field = make("label", { class: "field", for: id });
+    const select = make("select", { id });
+    for (let n = 1; n <= 16; n++) select.appendChild(make("option", { value: String(n), text: String(n) }));
+    field.append(make("span", { text: T(label) }), select);
+    select.value = String(chosen);
+    return { field, select };
+  };
+  const thresholdChoice = numberSelect("slip39-check-make-threshold", "Shares needed to restore", 2);
+  const countChoice = numberSelect("slip39-check-make-shares", "Shares to make", 3);
+  const makePassLabel = make("label", { class: "field", for: "slip39-check-make-pass" });
+  const makePassInput = make("input", { id: "slip39-check-make-pass", autocomplete: "off", spellcheck: "false", autocapitalize: "off", autocorrect: "off", "data-i18n-skip": "", translate: "no", placeholder: T("Enter a passphrase, or leave blank for none") });
+  const makeVault = new PassphraseVault();
+  const makeField = bindVaultField(makePassInput, makeVault);
+  const makeRow = make("div", { class: "row tool-actions" });
+  const makeButton = make("button", { type: "button", class: "btn primary", id: "slip39-check-make-run", text: T("Make shares") });
+
   const concealedBlock = make("div", { id: "slip39-check-concealed", hidden: true });
   const concealedNote = make("p", { class: "edge-note is-muted", text: T("Your shares were hidden when you left the page or stopped using it. Show them again to carry on.") });
   const concealedActions = make("div", { class: "row tool-actions" });
@@ -219,6 +260,14 @@ export function mountSlip39Check(host, {
   const headline = make("p");
   const headlinePlain = make("span");
   const headlineStrong = make("strong");
+  // Shares made from dice, masked until Show shares.
+  const madeBlock = make("div", { id: "slip39-check-made", hidden: true });
+  const madeActions = make("div", { class: "row tool-actions" });
+  const madeReveal = make("button", { type: "button", class: "btn secondary", id: "slip39-check-made-reveal", "aria-pressed": "false" });
+  const madeList = make("div", { id: "slip39-check-made-list" });
+  const madeNote = make("p", { class: "edge-note is-info", id: "slip39-check-made-note", text: T("Write each share on its own card, word for word, and keep the cards apart. Then type a recovery set back in Check a backup to make sure every copy is right. On your hardware wallet, restore from SLIP-39 (Shamir) shares.") });
+  const madeCheckRow = make("div", { class: "row tool-actions" });
+  const madeCheck = make("button", { type: "button", class: "btn primary", id: "slip39-check-made-check", text: T("Check my written shares") });
   const restoredBlock = make("div", { id: "slip39-check-restored", hidden: true });
   const summary = make("p", { class: "muted", id: "slip39-check-summary" });
   const fingerprintBlock = make("div", { id: "slip39-check-fingerprint" });
@@ -236,16 +285,27 @@ export function mountSlip39Check(host, {
   setBAddRow.append(setB.add);
   compareRow.append(compareButton);
   randomPanel.append(randomIntro, randomWarning, setALabel, setA.container, setAAddRow, setBLabel, setB.container, setBAddRow, compareRow);
+  diceCount.append(diceCue);
+  diceLabel.append(diceName, diceCount, diceInput);
+  makePassLabel.append(make("span", { text: T("Passphrase (optional)") }), makePassInput);
+  makeRow.append(makeButton);
+  makePanel.append(makeIntro, sizeControl, diceLabel, countChoice.field, thresholdChoice.field, makePassLabel, makeRow);
+  madeActions.append(madeReveal);
+  madeCheckRow.append(madeCheck);
+  madeBlock.append(madeActions, madeList, madeNote, madeCheckRow);
   concealedActions.append(unconcealButton);
   concealedBlock.append(concealedNote, concealedActions);
   restoredBlock.append(make("hr", { class: "result-divider" }), summary, fingerprintBlock, addressLabel, addressBlock, finalNote);
   status.append(headline, findingList, checkedNote);
-  result.append(status, restoredBlock);
-  host.replaceChildren(mode, backupPanel, randomPanel, concealedBlock, result);
+  result.append(status, madeBlock, restoredBlock);
+  host.replaceChildren(mode, backupPanel, randomPanel, makePanel, concealedBlock, result);
 
   // ── State ────────────────────────────────────────────────────────────────
   let current = "backup";
   let restored = null; // { fingerprint, addresses: { network: [...] }, shape }
+  let made = null; // { shares: [words], threshold, count } while shares made from dice show
+  let madeShown = false;
+  let size = 16;
   let concealed = false;
   const held = {}; // the fields' text while concealed, per set
   let destroyed = false;
@@ -388,8 +448,30 @@ export function mountSlip39Check(host, {
     checkedNote.hidden = !text;
   };
 
+  // The made shares, as private values: bullets until Show shares.
+  const renderMade = () => {
+    madeBlock.hidden = !made;
+    for (const item of madeList.children) forget(item);
+    if (!made) {
+      madeList.replaceChildren();
+      return;
+    }
+    relabel(madeReveal, "text", T(madeShown ? "Hide shares" : "Show shares"));
+    madeReveal.setAttribute("aria-pressed", String(madeShown));
+    madeList.replaceChildren(...made.shares.map((share, i) => {
+      const item = make("div", { "data-slip39-made-share": String(i + 1) });
+      const value = make("div", { translate: "no", "data-i18n-skip": "" });
+      value.innerHTML = privateValue(madeShown ? share : "\u2022".repeat(share.split(" ").length * 4), madeShown);
+      item.append(make("p", { class: "label", text: T("Share {n} of {count}", { n: i + 1, count: made.count }) }), value);
+      return item;
+    }));
+  };
+
   const resetResult = () => {
     restored = null;
+    made = null;
+    madeShown = false;
+    renderMade();
     renderRestored();
     setFindings([]);
     setChecked(null);
@@ -468,6 +550,54 @@ export function mountSlip39Check(host, {
     }
   }
 
+  // The roll count under the dice field, as the Key Station counts rolls.
+  const countRolls = () => {
+    const have = (diceInput.value.match(/[1-6]/g) ?? []).length, need = SLIP39_DICE_ROLLS[size];
+    diceCount.setAttribute("data-slip39-rolls", String(have));
+    diceCount.setAttribute("data-slip39-rolls-needed", String(need));
+    diceCue.className = have >= need ? "meta-cue" : "";
+    relabel(diceCue, "text", T("{have} of {need} rolls", { have, need }));
+  };
+  const setSize = (next) => {
+    size = next;
+    for (const button of sizeButtons) button.setAttribute("aria-pressed", String(Number(button.getAttribute("data-value")) === size));
+    countRolls();
+  };
+  // The rolls or a setting changed: the shares shown are no longer theirs.
+  const makeChanged = () => {
+    if (current === "make" && result.getAttribute("data-state") !== "empty") markStale(T("The rolls or a setting changed. Make the shares again."));
+  };
+
+  function runMake() {
+    if (destroyed || concealed) return;
+    resetResult();
+    const threshold = Number(thresholdChoice.select.value), count = Number(countChoice.select.value);
+    let passphrase = null, outcome = null;
+    try {
+      passphrase = makeVault.bytes();
+      outcome = slip39SharesFromDice(diceInput.value, { bytes: size, threshold, count, passphrase });
+      if (!outcome.ok) {
+        const vars = { ...outcome, bits: size * 8 }, text = MAKE_FAILURE[outcome.reason] ?? MAKE_FAILURE.count;
+        return fail(() => `${say(text, vars)} ${say("No shares were made.")}`);
+      }
+      const derived = derive(outcome.masterSecret);
+      restored = { fingerprint: derived.fingerprint, addresses: derived.addresses, shape: { identifier: outcome.identifier, extendable: false, iterationExponent: 1, groupThreshold: 1, groupCount: 1, length: size, groups: [{ index: 0, threshold, members: [] }] } };
+      made = { shares: outcome.shares, threshold, count, rolls: outcome.rolls };
+    } catch {
+      restored = null;
+      made = null;
+      return fail(T("The shares could not be made."));
+    } finally {
+      passphrase?.fill(0);
+      outcome?.masterSecret?.fill(0);
+    }
+    setState("made");
+    setStatus("edge-note is-public", T("Made {count} shares from {rolls} rolls. Any {threshold} of them restore the wallet below.", { count, rolls: made.rolls, threshold }));
+    relabel(summary, "text", summaryText(restored.shape));
+    renderMade();
+    renderRestored();
+  }
+
   const valueName = ({ level, group, x }) => {
     if (level === "group") return x === 254 ? say("The random part of the group-level digest share") : say("Group {group}'s group share, drawn at random", { group: x + 1 });
     return x === 254 ? say("The random part of group {group}'s digest share", { group: group + 1 }) : say("Share {member} of group {group}, drawn at random", { member: x + 1, group: group + 1 });
@@ -528,8 +658,9 @@ export function mountSlip39Check(host, {
     mode.hidden = concealed;
     backupPanel.hidden = concealed || current !== "backup";
     randomPanel.hidden = concealed || current !== "randomness";
+    makePanel.hidden = concealed || current !== "make";
     concealedBlock.hidden = !concealed;
-    (concealed ? concealedActions : current === "backup" ? runRow : compareRow).append(clearButton);
+    (concealed ? concealedActions : { backup: runRow, randomness: compareRow, make: makeRow }[current]).append(clearButton);
     for (const button of modeButtons) button.setAttribute("aria-pressed", String(button.getAttribute("data-value") === current));
   };
 
@@ -541,14 +672,22 @@ export function mountSlip39Check(host, {
     layout();
   };
 
-  const holdsShares = () => Object.values(lists).some((list) => list.entries.some((entry) => entry.field.value !== ""));
+  const holdsShares = () => diceInput.value !== "" || Object.values(lists).some((list) => list.entries.some((entry) => entry.field.value !== ""));
   const conceal = () => {
-    if (destroyed || concealed || !holdsShares()) return;
+    if (destroyed) return;
+    // Made shares go back to bullets on every trigger, typed or not.
+    if (madeShown) {
+      madeShown = false;
+      renderMade();
+    }
+    if (concealed || !holdsShares()) return;
     concealed = true;
     for (const [set, list] of Object.entries(lists)) {
       held[set] = list.entries.map((entry) => entry.field.value);
       for (const entry of list.entries) entry.field.value = "";
     }
+    held.dice = diceInput.value;
+    diceInput.value = "";
     layout();
   };
   const unconceal = () => {
@@ -558,6 +697,8 @@ export function mountSlip39Check(host, {
       for (const [i, entry] of list.entries.entries()) entry.field.value = held[set]?.[i] ?? "";
       delete held[set];
     }
+    diceInput.value = held.dice ?? "";
+    delete held.dice;
     layout();
   };
 
@@ -566,6 +707,11 @@ export function mountSlip39Check(host, {
     for (const set of Object.keys(held)) delete held[set];
     for (const set of Object.keys(lists)) resetList(set);
     passField.clear();
+    diceInput.value = "";
+    makeField.clear();
+    thresholdChoice.select.value = "2";
+    countChoice.select.value = "3";
+    setSize(16);
     resetResult();
     layout();
   };
@@ -573,6 +719,30 @@ export function mountSlip39Check(host, {
   for (const button of modeButtons) button.onclick = () => setMode(button.getAttribute("data-value"));
   runButton.onclick = runBackup;
   compareButton.onclick = runRandomness;
+  makeButton.onclick = runMake;
+  for (const button of sizeButtons) button.onclick = () => {
+    setSize(Number(button.getAttribute("data-value")));
+    makeChanged();
+  };
+  diceInput.oninput = () => {
+    if (concealed) return;
+    countRolls();
+    makeChanged();
+  };
+  thresholdChoice.select.onchange = makeChanged;
+  countChoice.select.onchange = makeChanged;
+  makePassInput.addEventListener("input", makeChanged);
+  madeReveal.onclick = () => {
+    if (destroyed || concealed || !made) return;
+    madeShown = !madeShown;
+    renderMade();
+  };
+  // The written copies are checked from paper: the backup check opens empty.
+  madeCheck.onclick = () => {
+    if (destroyed || concealed) return;
+    resetList("backup");
+    setMode("backup");
+  };
   unconcealButton.onclick = unconceal;
   clearButton.onclick = clear;
   // After the vault's own input listener, so the edit is in the vault.
@@ -589,6 +759,7 @@ export function mountSlip39Check(host, {
   doc.addEventListener("hodl:network-default", onNetwork);
 
   for (const set of Object.keys(lists)) resetList(set);
+  setSize(16);
   layout();
 
   return {
@@ -599,6 +770,7 @@ export function mountSlip39Check(host, {
     retranslate() {
       if (destroyed) return;
       for (const node of live.keys()) refresh(node);
+      renderMade();
       renderRestored();
     },
     destroy() {

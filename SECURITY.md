@@ -678,6 +678,24 @@ repeat or are broken, not a measure of randomness: a generator that never repeat
 still be predictable. The panel tells the user to enter throwaway wallets
 only.
 
+Its third mode, Make shares from dice, splits a new master secret into
+shares with the user's dice rolls as the only randomness; the page invents
+none (`src/js/slip39.js`, `slip39SharesFromDice`). As the Key Station's
+hashed rolls, the master secret is the first 16 or 32 bytes of SHA-256 of
+the roll digits, after at least 50 rolls for 128 bits or 100 for 256. Every
+value the split draws (the identifier, R and the random shares) is read in
+order from HKDF-SHA256 of that hash. Shares below the threshold therefore
+keep the secret only as long as the rolls cannot be guessed, which is the
+same bound as the secret itself. The split follows the specification's
+GenerateShares, and its shares match the reference implementation's word for
+word from the same bytes, from dice end to end (`test/slip39-split.test.mjs`).
+It writes the original (not extendable) format with iteration exponent 1,
+which every SLIP-39 wallet restores. The shares show as bullets until Show
+shares, go back to bullets on every conceal trigger, and are dropped when
+the rolls or a setting change, when the mode changes, and on Clear. The rolls
+are hidden like typed shares. Check my written shares opens the backup check
+empty, so the written copies are checked from paper.
+
 Typed shares, the passphrase and everything combined from them live in page
 memory and the panel's DOM only; there are no storage, clipboard or console
 writes (`test/slip39-check.test.mjs`). The master fingerprint and addresses

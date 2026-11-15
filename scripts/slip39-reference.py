@@ -22,8 +22,16 @@ in order. Some sets replace single draws with plain patterns (all zero, one
 byte repeated, a counter), reuse another set's stream, or return the same
 buffer on every draw, to model a generator that restarts from the same
 state or returns trivial output.
+
+The "dice" sets pin EntropyLab's Make shares from dice end to end, with the
+convention computed here independently: pool = SHA-256 of the roll digits
+(the Key Station's "hashed rolls", faces 1-6), master secret = the first 16
+or 32 bytes of the pool, and every splitting draw read in order from
+HKDF-SHA256 (RFC 5869, empty salt, info "EntropyLab SLIP-39 shares") of the
+pool. The original (not extendable) format, iteration exponent 1.
 """
 import hashlib
+import hmac
 import json
 from pathlib import Path
 import secrets
@@ -83,6 +91,53 @@ class Repeating:
 
     def take(self, n: int) -> bytes:
         return self.source[:n]
+
+
+class HkdfStream:
+    """Draws read in order from HKDF-SHA256(ikm, salt = empty, info, length)."""
+
+    def __init__(self, ikm: bytes, info: bytes, length: int):
+        prk = hmac.new(b"", ikm, hashlib.sha256).digest()
+        out, block, counter = b"", b"", 1
+        while len(out) < length:
+            block = hmac.new(prk, block + info + bytes([counter]), hashlib.sha256).digest()
+            out += block
+            counter += 1
+        self.buffer = out[:length]
+
+    def take(self, n: int) -> bytes:
+        assert len(self.buffer) >= n, "stream exhausted"
+        out, self.buffer = self.buffer[:n], self.buffer[n:]
+        return out
+
+
+def dice_rolls(label: str, count: int) -> str:
+    rolls, block = "", 0
+    while len(rolls) < count:
+        for byte in hashlib.sha256((label + str(block)).encode()).digest():
+            if byte < 252 and len(rolls) < count:
+                rolls += str(byte % 6 + 1)
+        block += 1
+    return rolls
+
+
+def dice_set(name: str, rolls: str, n: int, threshold: int, count: int, passphrase: str = "") -> dict:
+    pool = hashlib.sha256(rolls.encode()).digest()
+    need = 2 + ((threshold - 2) * n + (n - 4) if threshold >= 2 else 0)
+    stream = HkdfStream(pool, b"EntropyLab SLIP-39 shares", need)
+    spec = dict(name=name, masterSecret=pool[:n], passphrase=passphrase, iterationExponent=1, extendable=False, groupThreshold=1, groups=[(threshold, count)], stream=stream)
+    out = generate(spec)
+    assert stream.buffer == b"", "every drawn byte is used"
+    return {"rolls": rolls, "pool": pool.hex(), **out}
+
+
+DICE = [
+    ("dice 2-of-3, 128-bit", dice_rolls("dice a", 50), 16, 2, 3, ""),
+    ("dice 3-of-5, 256-bit, passphrase", dice_rolls("dice b", 100), 32, 3, 5, "dice pass"),
+    ("dice 1-of-1, 128-bit", dice_rolls("dice c", 60), 16, 1, 1, ""),
+    ("dice 5-of-7, 128-bit, extra rolls", dice_rolls("dice d", 120), 16, 5, 7, ""),
+    ("dice 16-of-16, 256-bit", dice_rolls("dice e", 100), 32, 16, 16, ""),
+]
 
 
 def secret(label: str, n: int) -> bytes:
@@ -213,9 +268,10 @@ def main():
         "source": {"library": "python-shamir-mnemonic (the SLIP-0039 reference implementation)", "version": VERSION, "commit": COMMIT, "license": "MIT", "generator": "scripts/slip39-reference.py"},
         "randomSource": "Block k of stream L is SHA-256(L || uint32_be(k)), bytes drawn in order; 'one buffer every call' returns the start of SHA-256(L) x 4 on every draw; overrides replace single draws.",
         "sets": sets,
+        "dice": [dice_set(*entry) for entry in DICE],
     }
     OUT.write_text(json.dumps(out, indent=1) + "\n")
-    print(f"wrote {OUT.relative_to(ROOT)}: {len(sets)} sets")
+    print(f"wrote {OUT.relative_to(ROOT)}: {len(sets)} sets, {len(out['dice'])} dice sets")
 
 
 main()

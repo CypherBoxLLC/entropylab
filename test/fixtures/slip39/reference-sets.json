@@ -1053,5 +1053,333 @@
     ]
    ]
   }
+ ],
+ "dice": [
+  {
+   "rolls": "32655444566354514553331243332152541243251522232542",
+   "pool": "56812ded7a1999463c902d94ed84740648255cb6615c621993f6578cc632065e",
+   "name": "dice 2-of-3, 128-bit",
+   "masterSecret": "56812ded7a1999463c902d94ed847406",
+   "passphrase": "",
+   "iterationExponent": 1,
+   "extendable": false,
+   "groupThreshold": 1,
+   "groups": [
+    [
+     2,
+     3
+    ]
+   ],
+   "identifier": 32581,
+   "encryptedMasterSecret": "675ea91235ca710ab454443b9f4edb83",
+   "draws": [
+    {
+     "kind": "identifier",
+     "hex": "ff45"
+    },
+    {
+     "kind": "digest-random",
+     "level": "member",
+     "x": 254,
+     "group": 0,
+     "hex": "ca7a432ff38aada79d368f2d"
+    }
+   ],
+   "mnemonics": [
+    [
+     "wrote costume academic acid boring chest papa demand listen deadline suitable alcohol level galaxy twin dryer daisy wrote plunge sled",
+     "wrote costume academic agency database living spark frost hairy capacity execute jury dish satoshi tension regular ajar pants welfare national",
+     "wrote costume academic always chubby iris editor evil surface evening usual ultimate hybrid kidney walnut diminish earth window pulse flip"
+    ]
+   ]
+  },
+  {
+   "rolls": "2331313226222323254141545131552114412416163625453516135264114455612616523135641422152243351332361661",
+   "pool": "21edb14ab772bd562f92062163561f0e9677ceade5f14391a4077517aef4f4d2",
+   "name": "dice 3-of-5, 256-bit, passphrase",
+   "masterSecret": "21edb14ab772bd562f92062163561f0e9677ceade5f14391a4077517aef4f4d2",
+   "passphrase": "dice pass",
+   "iterationExponent": 1,
+   "extendable": false,
+   "groupThreshold": 1,
+   "groups": [
+    [
+     3,
+     5
+    ]
+   ],
+   "identifier": 24631,
+   "encryptedMasterSecret": "5b6ce864353e85f1acde8e03b42586f5e5edde60c63a0ac5992c1ad790378126",
+   "draws": [
+    {
+     "kind": "identifier",
+     "hex": "6037"
+    },
+    {
+     "kind": "share",
+     "level": "member",
+     "x": 0,
+     "group": 0,
+     "hex": "caf51f0b7e240bcfdb3ddb5c609b5ee331cc30c63438cf29d791500fb5ec41ce"
+    },
+    {
+     "kind": "digest-random",
+     "level": "member",
+     "x": 254,
+     "group": 0,
+     "hex": "acdb28819971dff7ff5d874ac881cf2a583b075196d568f866bca41e"
+    }
+   ],
+   "mnemonics": [
+    [
+     "roster regret academic acne arcade revenue careful custody terminal adorn smith herd symbolic staff gasoline hobo unfold sister single satisfy glen aspect smear picture jerky favorite avoid starting scandal increase advance heat theater",
+     "roster regret academic agree again slavery salary superior keyboard hand romantic repair counter playoff crucial mason viral alive painting loan shrimp mayor salon volume location amazing cause artist install drug march hour iris",
+     "roster regret academic amazing argue intimate exceed check club animal intend detailed fatal income heat duration endless rhyme lunch prepare wireless airport estate finance lunar game guitar clinic analysis olympic sidewalk demand making",
+     "roster regret academic arcade airport alien merit spew recover garlic alcohol theory phrase auction coding tackle frost injury therapy trend false lizard enforce airline item adult enforce yelp resident solution emperor debut cards",
+     "roster regret academic axle answer belong formal beyond exchange punish strategy campus mineral worthy clothes math scramble username adorn mandate answer inherit mother hospital agency length closet debris strike process angel step physics"
+    ]
+   ]
+  },
+  {
+   "rolls": "232262131545332532412412144466414231566126116251211461655111",
+   "pool": "77c49a7b787959bd44947f01f34ce4ef21729dfc879db0395574566588c2903e",
+   "name": "dice 1-of-1, 128-bit",
+   "masterSecret": "77c49a7b787959bd44947f01f34ce4ef",
+   "passphrase": "",
+   "iterationExponent": 1,
+   "extendable": false,
+   "groupThreshold": 1,
+   "groups": [
+    [
+     1,
+     1
+    ]
+   ],
+   "identifier": 2877,
+   "encryptedMasterSecret": "cc41b6216fd490b478a943482397eed2",
+   "draws": [
+    {
+     "kind": "identifier",
+     "hex": "8b3d"
+    }
+   ],
+   "mnemonics": [
+    [
+     "body training academic academic depart educate step boring view method soldier makeup facility enlarge mayor language radar ruin depend fraction"
+    ]
+   ]
+  },
+  {
+   "rolls": "235655356555233241312251221515412122465543564614244113134236111365532645526125131335423423334431214161531533542124326424",
+   "pool": "5b05ce1bc31f8caa4bb703c726357c5b88f602720601e4b81e8176ddf8eb2b29",
+   "name": "dice 5-of-7, 128-bit, extra rolls",
+   "masterSecret": "5b05ce1bc31f8caa4bb703c726357c5b",
+   "passphrase": "",
+   "iterationExponent": 1,
+   "extendable": false,
+   "groupThreshold": 1,
+   "groups": [
+    [
+     5,
+     7
+    ]
+   ],
+   "identifier": 29815,
+   "encryptedMasterSecret": "8f06238996fa952332780cd99c7927d9",
+   "draws": [
+    {
+     "kind": "identifier",
+     "hex": "7477"
+    },
+    {
+     "kind": "share",
+     "level": "member",
+     "x": 0,
+     "group": 0,
+     "hex": "d3ef88b76e4164f6ef6a2da122626b14"
+    },
+    {
+     "kind": "share",
+     "level": "member",
+     "x": 1,
+     "group": 0,
+     "hex": "ec8c2ef93a7c4becbd19e01fd4ff7ee5"
+    },
+    {
+     "kind": "share",
+     "level": "member",
+     "x": 2,
+     "group": 0,
+     "hex": "66f1202c2d41cd54c3a392f905d9f46f"
+    },
+    {
+     "kind": "digest-random",
+     "level": "member",
+     "x": 254,
+     "group": 0,
+     "hex": "cb42fbd501de27fd038f28df"
+    }
+   ],
+   "mnemonics": [
+    [
+     "trash regret academic acrobat desktop unusual chew intimate merit grasp superior vitamins manager papa magazine cluster scholar birthday railroad fantasy",
+     "trash regret academic aircraft dominant manual resident modify paces evidence python software isolate carve fatigue voting remember hazard necklace evidence",
+     "trash regret academic amount browser usual learn salt extra slavery fangs divorce threaten wavy both pacific burning view type violence",
+     "trash regret academic argue dance shrimp painting spray oasis ting charity august scroll elegant lift grief kidney rapids cards junk",
+     "trash regret academic beard anatomy item talent guest closet permit answer identify mayor echo herald nervous trash pulse galaxy sugar",
+     "trash regret academic blanket breathe smoking starting axis rainbow miracle deploy garbage survive teammate campus fatal sidewalk tendency column oral",
+     "trash regret academic broken decent method smug maximum award cubic elegant charity clothes decent moisture flea that finance spider timely"
+    ]
+   ]
+  },
+  {
+   "rolls": "3413455261633213342525444525124126254452563211413152631253346421151646455135335331552116163652136321",
+   "pool": "11dd8a4c9d7ee4ce476298259b53e26c6356c69bfd0d94b31ae024fea1c22c29",
+   "name": "dice 16-of-16, 256-bit",
+   "masterSecret": "11dd8a4c9d7ee4ce476298259b53e26c6356c69bfd0d94b31ae024fea1c22c29",
+   "passphrase": "",
+   "iterationExponent": 1,
+   "extendable": false,
+   "groupThreshold": 1,
+   "groups": [
+    [
+     16,
+     16
+    ]
+   ],
+   "identifier": 15876,
+   "encryptedMasterSecret": "fce2a951d28e5f321c841fb52dd87fe2c190ab36943cf4d130187e5cd3aa9ba5",
+   "draws": [
+    {
+     "kind": "identifier",
+     "hex": "3e04"
+    },
+    {
+     "kind": "share",
+     "level": "member",
+     "x": 0,
+     "group": 0,
+     "hex": "09a293c85bbc42183e53c79e0ba844c676efc68db3eaaeaf54fb4e24cdbcc515"
+    },
+    {
+     "kind": "share",
+     "level": "member",
+     "x": 1,
+     "group": 0,
+     "hex": "8c3af2c06718b107fe9d1cd5e980212bbadf4d76aa0849ddeb80157200d6618f"
+    },
+    {
+     "kind": "share",
+     "level": "member",
+     "x": 2,
+     "group": 0,
+     "hex": "24f5a51f323d8a7c5344184b214d049d1c3e3aac23e05cbed50bdf3564795a7c"
+    },
+    {
+     "kind": "share",
+     "level": "member",
+     "x": 3,
+     "group": 0,
+     "hex": "8c1e87761945601304e379eab1d103e14d0f5bad3d39689f936d36b56fd52509"
+    },
+    {
+     "kind": "share",
+     "level": "member",
+     "x": 4,
+     "group": 0,
+     "hex": "bab0a3a0424688f06311c030d6ff0ae50f3683174f91843eace21bd38c0f4891"
+    },
+    {
+     "kind": "share",
+     "level": "member",
+     "x": 5,
+     "group": 0,
+     "hex": "69b5620cf829449ee390a79e777c770fb9665a5385dbed8619e8bb214c799889"
+    },
+    {
+     "kind": "share",
+     "level": "member",
+     "x": 6,
+     "group": 0,
+     "hex": "36ff3bd00574b0448642adc76ec82d18626488ccb148534f5e2db670985acd31"
+    },
+    {
+     "kind": "share",
+     "level": "member",
+     "x": 7,
+     "group": 0,
+     "hex": "3f86e8607794bd70050461bddab59b1d79bedb87e6a196e5e0f9bea33880650d"
+    },
+    {
+     "kind": "share",
+     "level": "member",
+     "x": 8,
+     "group": 0,
+     "hex": "0ae0d5e47c61abf66833780a8c4a1a7130d0c01e5a033f84f428b7c179aaa11a"
+    },
+    {
+     "kind": "share",
+     "level": "member",
+     "x": 9,
+     "group": 0,
+     "hex": "3ae2233463cd09eec42dde892164a17ffde268cb3b2cec35f87946d357dbcd14"
+    },
+    {
+     "kind": "share",
+     "level": "member",
+     "x": 10,
+     "group": 0,
+     "hex": "7f699df0d61b3dd2caf436e1ccdc91e8a74badb6558206895915a6e182879f1e"
+    },
+    {
+     "kind": "share",
+     "level": "member",
+     "x": 11,
+     "group": 0,
+     "hex": "3989fb9834aa0e0e6f0311b7671b6cc89bb3c33e3f5ebf9f0d4ca1ffb4059a83"
+    },
+    {
+     "kind": "share",
+     "level": "member",
+     "x": 12,
+     "group": 0,
+     "hex": "51dd39db45fb30079441878599869009d478b3418539771cafc6a38befda155c"
+    },
+    {
+     "kind": "share",
+     "level": "member",
+     "x": 13,
+     "group": 0,
+     "hex": "830fe6a059106e66dd4d85190c88a6b283134577e684f8629dbee395dc0d065c"
+    },
+    {
+     "kind": "digest-random",
+     "level": "member",
+     "x": 254,
+     "group": 0,
+     "hex": "b689a82de5608b8b3980ed64d6ab4a2990a9f86d2eac6c914bc1513f"
+    }
+   ],
+   "mnemonics": [
+    [
+     "keyboard cause academic afraid acne guitar moisture champion resident axle branch wealthy dream toxic antenna papa evoke ordinary unwrap budget suitable western prize revenue explain species climate diet sister emphasis jury hush class",
+     "keyboard cause academic alto ambition august velvet actress idle crush alto welfare soldier detailed trend acne believe union talent device havoc lend equip iris recover airline impact advance grill goat buyer pistol staff",
+     "keyboard cause academic anxiety adjust drove perfect kitchen class glad kidney exceed educate belong champion describe equip energy duckling triumph safari walnut freshman window eyebrow voting detailed mineral move paces glance memory hospital",
+     "keyboard cause academic award ambition already loyalty steady morning flea benefit beyond dining junction puny else duckling fantasy aviation hospital spelling exercise guitar lair diet exclude raisin robin family elder paper emission fraction",
+     "keyboard cause academic bike antenna pregnant peanut lecture cleanup party upstairs marathon busy apart stadium wisdom privacy elite dictate aquatic inform thorn lilac western slim losing species deal victim cleanup airport exceed strike",
+     "keyboard cause academic bracelet alcohol hobo geology deploy level fact owner mayor ancient toxic involve vampire hybrid unhappy grin hamster discuss intimate undergo brave overall dance champion decrease numb chemical orbit intend genuine",
+     "keyboard cause academic burning advance romantic dragon easy flame crunch emerald broken criminal image hour ceiling software breathe grant chubby silent false fantasy drove texture holiday husky genius presence evoke rainbow dance blimp",
+     "keyboard cause academic carve afraid tenant training legs jewelry database husband biology ending human submit square puny fumes rival home lair pipeline museum nail avoid humidity payroll tension album elephant element drift response",
+     "keyboard cause academic class acne recover spray mineral screw hawk visual pants dining admit marathon costume pickup evil snapshot acid tidy leaves earth bike election custody ruler tofu playoff endorse wolf wavy unwrap",
+     "keyboard cause academic company advocate regular chubby software drift elder universe axle sympathy patent champion mixed bracelet yield terminal payroll quick silent type station luck faint speak galaxy retreat emperor vegan camera petition",
+     "keyboard cause academic crucial alto subject organize satoshi genre smell space crucial elephant regret skunk imply carbon craft evening realize gray gasoline alcohol clock mild hand tenant ancestor judicial security pistol dive stilt",
+     "keyboard cause academic deadline advocate gesture wine gather escape lift auction response decision holy group holiday skin coal quiet arena theory starting rocky keyboard spill costume yoga smoking focus pants golden indicate amount",
+     "keyboard cause academic deploy aircraft involve dive hesitate game single already fact brave temple numb building acne inherit ivory slap brave exercise invasion improve withdraw pitch mansion robin paper fitness mild smart prize",
+     "keyboard cause academic diploma aluminum says tofu legal midst burden gross inherit steady endless arcade chest hazard pants best blind lair papa warmth main surface reject much husband smug music client declare raspy",
+     "keyboard cause academic dragon aide often permit crunch sprinkle raspy wrap loyalty midst kidney budget slap junction prayer ruin kidney round primary nuclear element oasis easy cowboy apart kernel mansion clock peanut grownup",
+     "keyboard cause academic easel academic promise freshman coastal merit budget symbolic aquatic recover daisy plot raspy home hour airline emphasis income advance lizard payroll legal flea pants kidney wireless argue sidewalk rival morning"
+    ]
+   ]
+  }
  ]
 }

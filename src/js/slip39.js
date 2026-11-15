@@ -16,7 +16,8 @@
 // master secret, encrypted secret or random value. The passphrase must be
 // printable ASCII, as the specification requires. Intermediate buffers are
 // zeroed before return; callers zero what they are given (wipeSlip39).
-import { hmacSha256 } from "./hsm-secret.js";
+import { sha256 } from "./hashes.js";
+import { hkdfSha256, hmacSha256 } from "./hsm-secret.js";
 import { slip39Wordlist } from "./slip39-wordlist.js";
 
 const METADATA_WORDS = 7; // identifier and exponent (2), share parameters (2), checksum (3)
@@ -268,14 +269,15 @@ export function pbkdf2HmacSha256(password, salt, iterations, length) {
   }
 }
 
-// The specification's Decryption: a four-round Feistel network with
-// PBKDF2-HMAC-SHA256 as the round function, rounds 3 to 0.
-function decrypt(ems, passphrase, { identifier, extendable, iterationExponent }) {
-  const half = ems.length / 2;
+// The specification's Encryption and Decryption: a four-round Feistel
+// network with PBKDF2-HMAC-SHA256 as the round function. Encryption runs
+// rounds 0 to 3, decryption 3 to 0; both output R || L.
+function feistel(input, passphrase, { identifier, extendable, iterationExponent }, rounds) {
+  const half = input.length / 2;
   const prefix = extendable ? [] : [...CUSTOMIZATION.original, identifier >>> 8, identifier & 0xff];
   const iterations = (BASE_ITERATIONS << iterationExponent) / ROUNDS;
-  let left = ems.slice(0, half), right = ems.slice(half);
-  for (let round = ROUNDS - 1; round >= 0; round--) {
+  let left = input.slice(0, half), right = input.slice(half);
+  for (const round of rounds) {
     const password = new Uint8Array(1 + passphrase.length);
     password[0] = round;
     password.set(passphrase, 1);
@@ -289,13 +291,16 @@ function decrypt(ems, passphrase, { identifier, extendable, iterationExponent })
     left = right;
     right = next;
   }
-  const secret = new Uint8Array(ems.length);
-  secret.set(right);
-  secret.set(left, half);
+  const output = new Uint8Array(input.length);
+  output.set(right);
+  output.set(left, half);
   left.fill(0);
   right.fill(0);
-  return secret;
+  return output;
 }
+const decrypt = (ems, passphrase, params) => feistel(ems, passphrase, params, [3, 2, 1, 0]);
+const encrypt = (masterSecret, passphrase, params) => feistel(masterSecret, passphrase, params, [0, 1, 2, 3]);
+const printable = (byte) => byte >= 32 && byte <= 126;
 
 // A threshold set and the passphrase's bytes to the master secret (the BIP32
 // seed itself), with the set's shape; or a refusal: "passphrase" (not
@@ -303,7 +308,7 @@ function decrypt(ems, passphrase, { identifier, extendable, iterationExponent })
 // step doubles the PBKDF2 work, which runs on the page's thread) or any of
 // recoverSlip39's.
 export function combineSlip39(shares, passphrase = new Uint8Array(0), { maxIterationExponent = 15 } = {}) {
-  if (!passphrase.every((byte) => byte >= 32 && byte <= 126)) return refuse("passphrase");
+  if (!passphrase.every(printable)) return refuse("passphrase");
   const recovered = recover(shares, { withRandom: false });
   if (!recovered.ok) return recovered;
   const { ems, ...shape } = recovered;
@@ -315,6 +320,169 @@ export function combineSlip39(shares, passphrase = new Uint8Array(0), { maxItera
     return { ...shape, masterSecret: decrypt(ems, passphrase, shape) };
   } finally {
     ems.fill(0);
+  }
+}
+
+// ── Making shares ────────────────────────────────────────────────────────
+const MAX_SHARES = 16; // group and member counts and thresholds are 4-bit fields
+
+// The specification's rs1024_create_checksum.
+function createChecksum(indices, extendable) {
+  const check = polymod([...(extendable ? CUSTOMIZATION.extendable : CUSTOMIZATION.original), ...indices, 0, 0, 0]) ^ 1;
+  return [(check >>> 20) & 1023, (check >>> 10) & 1023, check & 1023];
+}
+
+// A share's fields to its words: the inverse of parseSlip39Share.
+function encodeShare({ identifier, extendable, iterationExponent, groupIndex, groupThreshold, groupCount, memberIndex, memberThreshold, value }) {
+  const valueWords = Math.ceil((value.length * 8) / 10);
+  const idExp = (identifier << 5) | ((extendable ? 1 : 0) << 4) | iterationExponent;
+  const params = (groupIndex << 16) | ((groupThreshold - 1) << 12) | ((groupCount - 1) << 8) | (memberIndex << 4) | (memberThreshold - 1);
+  const indices = [idExp >>> 10, idExp & 1023, params >>> 10, params & 1023];
+  // The value is big-endian base 1024 behind its zero padding bits.
+  let acc = 0, bits = valueWords * 10 - value.length * 8;
+  for (const byte of value) {
+    acc = (acc << 8) | byte;
+    bits += 8;
+    while (bits >= 10) {
+      bits -= 10;
+      indices.push((acc >>> bits) & 1023);
+      acc &= (1 << bits) - 1;
+    }
+  }
+  acc = 0;
+  indices.push(...createChecksum(indices, extendable));
+  const words = indices.map((index) => slip39Wordlist[index]).join(" ");
+  indices.fill(0);
+  return words;
+}
+
+const take = (randomBytes, n) => {
+  const bytes = randomBytes(n);
+  if (!(bytes instanceof Uint8Array) || bytes.length !== n) throw new Error("The byte source gave the wrong number of bytes.");
+  return Uint8Array.from(bytes);
+};
+
+// The specification's SplitSecret: the random shares at x = 0..T-3 and R
+// (in that order) from the byte source, the digest share at x = 254, the
+// secret at x = 255, and every other share interpolated.
+function splitSecret(threshold, count, secret, randomBytes) {
+  if (threshold === 1) return Array.from({ length: count }, (_, x) => ({ x, y: Uint8Array.from(secret) }));
+  const drawn = [];
+  for (let x = 0; x < threshold - 2; x++) drawn.push({ x, y: take(randomBytes, secret.length) });
+  const random = take(randomBytes, secret.length - DIGEST_BYTES);
+  const check = hmacSha256(random, secret);
+  const digest = new Uint8Array(secret.length);
+  digest.set(check.subarray(0, DIGEST_BYTES));
+  digest.set(random, DIGEST_BYTES);
+  check.fill(0);
+  random.fill(0);
+  try {
+    const base = [...drawn, { x: DIGEST_INDEX, y: digest }, { x: SECRET_INDEX, y: secret }];
+    const shares = drawn.map(({ x, y }) => ({ x, y: Uint8Array.from(y) }));
+    for (let x = threshold - 2; x < count; x++) shares.push({ x, y: interpolate(base, x) });
+    return shares;
+  } finally {
+    for (const point of drawn) point.y.fill(0);
+    digest.fill(0);
+  }
+}
+
+// The specification's GenerateShares: a master secret (16 to 64 bytes,
+// even) to its shares, grouped, with every random value read from
+// `randomBytes(n)` in the order the specification draws them: the
+// identifier (15 bits of 2 bytes), then the group-level split, then each
+// group's. Refusals: "length", "count", "group-threshold", "threshold",
+// "threshold-one" (one share needed but several made), "iteration-exponent"
+// and "passphrase". This module never makes a random value itself.
+export function splitSlip39(masterSecret, { groupThreshold = 1, groups, passphrase = new Uint8Array(0), iterationExponent = 1, extendable = false, randomBytes } = {}) {
+  const length = masterSecret?.length ?? 0;
+  if (length < MIN_SECRET_BYTES || length > MAX_SECRET_BYTES || length % 2) return refuse("length");
+  if (!Array.isArray(groups) || groups.length < 1 || groups.length > MAX_SHARES) return refuse("count");
+  if (!Number.isInteger(groupThreshold) || groupThreshold < 1 || groupThreshold > groups.length) return refuse("group-threshold");
+  for (const [threshold, count] of groups) {
+    if (!Number.isInteger(count) || count < 1 || count > MAX_SHARES) return refuse("count");
+    if (!Number.isInteger(threshold) || threshold < 1 || threshold > count) return refuse("threshold");
+    if (threshold === 1 && count > 1) return refuse("threshold-one");
+  }
+  if (!Number.isInteger(iterationExponent) || iterationExponent < 0 || iterationExponent > 15) return refuse("iteration-exponent");
+  if (!passphrase.every(printable)) return refuse("passphrase");
+  if (typeof randomBytes !== "function") throw new Error("splitSlip39 needs a byte source.");
+  const id = take(randomBytes, 2);
+  const identifier = ((id[0] << 8) | id[1]) & 0x7fff;
+  id.fill(0);
+  const ems = encrypt(masterSecret, passphrase, { identifier, extendable, iterationExponent });
+  let groupShares = [];
+  try {
+    groupShares = splitSecret(groupThreshold, groups.length, ems, randomBytes);
+  } finally {
+    ems.fill(0);
+  }
+  try {
+    const out = groupShares.map(({ x: groupIndex, y: groupSecret }) => {
+      const [memberThreshold, count] = groups[groupIndex];
+      const members = splitSecret(memberThreshold, count, groupSecret, randomBytes);
+      try {
+        return members.map(({ x: memberIndex, y: value }) => encodeShare({ identifier, extendable, iterationExponent, groupIndex, groupThreshold, groupCount: groups.length, memberIndex, memberThreshold, value }));
+      } finally {
+        for (const member of members) member.y.fill(0);
+      }
+    });
+    return { ok: true, identifier, groups: out };
+  } finally {
+    for (const share of groupShares) share.y.fill(0);
+  }
+}
+
+// Make shares from dice: the rolls (faces 1-6, spaces and line breaks
+// between them allowed) are the only randomness. As the Key Station's hashed
+// rolls, the master secret is the first 16 or 32 bytes of SHA-256 of the
+// roll digits; every splitting value is read in order from HKDF-SHA256 of
+// that hash (empty salt, info "EntropyLab SLIP-39 shares"). One group,
+// threshold-of-count, iteration exponent 1, the original (not extendable)
+// format that every SLIP-39 wallet restores. Shares below the threshold keep
+// the secret as long as the rolls cannot be guessed. Refusals: "length",
+// "not-dice" (with the 1-based position), "too-few-rolls" (50 for 128 bits,
+// 100 for 256) and splitSlip39's.
+export const SLIP39_DICE_ROLLS = Object.freeze({ 16: 50, 32: 100 });
+const DICE_INFO = Uint8Array.from(asciiCodes("EntropyLab SLIP-39 shares"));
+export function slip39SharesFromDice(text, { bytes = 16, threshold, count, passphrase = new Uint8Array(0) } = {}) {
+  const need = SLIP39_DICE_ROLLS[bytes];
+  if (!need) return refuse("length");
+  const input = String(text ?? "");
+  const digits = new Uint8Array(input.length);
+  let rolls = 0;
+  try {
+    for (let i = 0; i < input.length; i++) {
+      const code = input.charCodeAt(i);
+      if (code >= 0x31 && code <= 0x36) digits[rolls++] = code;
+      else if (!/\s/.test(input[i])) return refuse("not-dice", { position: i + 1 });
+    }
+    if (rolls < need) return refuse("too-few-rolls", { have: rolls, need });
+    const pool = sha256(digits.subarray(0, rolls));
+    const masterSecret = pool.slice(0, bytes);
+    let stream = null, offset = 0;
+    const draws = () => 2 + (threshold >= 2 ? (threshold - 2) * bytes + bytes - DIGEST_BYTES : 0);
+    // Derived on the first draw, after the split has checked its options.
+    const randomBytes = (n) => {
+      stream ??= hkdfSha256(pool, new Uint8Array(0), DICE_INFO, draws());
+      const out = stream.slice(offset, offset + n);
+      offset += n;
+      return out;
+    };
+    try {
+      const result = splitSlip39(masterSecret, { groups: [[threshold, count]], passphrase, iterationExponent: 1, extendable: false, randomBytes });
+      if (!result.ok) {
+        masterSecret.fill(0);
+        return result;
+      }
+      if (offset !== draws()) throw new Error("The split drew an unexpected number of bytes.");
+      return { ok: true, masterSecret, identifier: result.identifier, shares: result.groups[0], rolls };
+    } finally {
+      pool.fill(0);
+      stream?.fill(0);
+    }
+  } finally {
+    digits.fill(0);
   }
 }
 
